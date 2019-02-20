@@ -297,7 +297,7 @@ int cam_sensor_i2c_command_parser(
 {
 	int16_t                   rc = 0, i = 0;
 	size_t                    len_of_buff = 0;
-	uint64_t                  generic_ptr;
+	uintptr_t                  generic_ptr;
 	uint16_t                  cmd_length_in_bytes = 0;
 
 	for (i = 0; i < num_cmd_buffers; i++) {
@@ -319,11 +319,11 @@ int cam_sensor_i2c_command_parser(
 			continue;
 
 		rc = cam_mem_get_cpu_buf(cmd_desc[i].mem_handle,
-			(uint64_t *)&generic_ptr, &len_of_buff);
+			&generic_ptr, &len_of_buff);
 		cmd_buf = (uint32_t *)generic_ptr;
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
-				"cmd hdl failed:%d, Err: %d, Buffer_len: %ld",
+				"cmd hdl failed:%d, Err: %d, Buffer_len: %zd",
 				cmd_desc[i].mem_handle, rc, len_of_buff);
 			return rc;
 		}
@@ -1480,7 +1480,8 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 
 			rc = msm_cam_sensor_handle_reg_gpio(
 				power_setting->seq_type,
-				gpio_num_info, 1);
+				gpio_num_info,
+				(int) power_setting->config_val);
 			if (rc < 0) {
 				CAM_ERR(CAM_SENSOR,
 					"Error in handling VREG GPIO");

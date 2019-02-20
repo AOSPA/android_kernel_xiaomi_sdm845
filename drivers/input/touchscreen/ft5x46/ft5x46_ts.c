@@ -14,7 +14,7 @@
  */
 #include <linux/input/ft5x46_ts.h>
 #include <linux/hwinfo.h>
-#include <linux/input/touch_common_info.h>
+
 #include "ft8716_pramboot.h"
 
 /* #define FT5X46_DEBUG_PERMISSION */
@@ -1261,7 +1261,6 @@ static int ft8716_load_firmware(struct ft5x46_data *ft5x46,
 	u32 check_off = 0x20;
 	u32 start_addr = 0x00;
 	u8 packet_buf[16 + FT5X0X_PACKET_LENGTH];
-	u8 *tp_maker = NULL;
 
 	const struct firmware *fw;
 	int packet_num;
@@ -1301,13 +1300,6 @@ static int ft8716_load_firmware(struct ft5x46_data *ft5x46,
 			return error;
 		}
 		update_hardware_info(TYPE_TP_MAKER, ft5x46->lockdown_info[0] - 0x30);
-		tp_maker = kzalloc(20, GFP_KERNEL);
-		if (tp_maker == NULL)
-			dev_err(ft5x46->dev, "fail to alloc vendor name memory\n");
-		else {
-			kfree(tp_maker);
-			tp_maker = NULL;
-		}
 		ft5x46->lockdown_info_acquired = true;
 		wake_up(&ft5x46->lockdown_info_acquired_wq);
 	}
@@ -1711,7 +1703,6 @@ static int ft5x46_read_gesture(struct ft5x46_data *ft5x46)
 {
 	unsigned char buf[FT5X46_GESTURE_POINTS_HEADER] = { 0 };
 	int error = 0;
-	char ch[64] = {0x0,};
 
 	error = ft5x46_read_block(ft5x46, 0xD3, buf,
 			FT5X46_GESTURE_POINTS_HEADER);
@@ -1729,8 +1720,6 @@ static int ft5x46_read_gesture(struct ft5x46_data *ft5x46)
 		input_sync(ft5x46->input);
 		input_event(ft5x46->input, EV_KEY, KEY_WAKEUP, 0);
 		input_sync(ft5x46->input);
-		ft5x46->dbclick_count++;
-		snprintf(ch, sizeof(ch), "%d", ft5x46->dbclick_count);
 	}
 
 	return 0;
@@ -3052,6 +3041,10 @@ static int fb_notifier_cb(struct notifier_block *self,
 	struct ft5x46_data *ft5x46 =
 		container_of(self, struct ft5x46_data, drm_notifier);
 
+	if (!ft5x46->hw_is_ready) {
+		dev_err(ft5x46->dev, "Touch Hardware is not ready, skip");
+		return rc;
+	}
 	/* Receive notifications from primary panel only */
 	if (evdata && evdata->data && ft5x46 && evdata->is_primary) {
 		if (event == DRM_EVENT_BLANK) {
@@ -3413,7 +3406,6 @@ static void ft5x46_switch_mode_work(struct work_struct *work)
 	struct ft5x46_mode_switch *ms = container_of(work, struct ft5x46_mode_switch, switch_mode_work);
 	struct ft5x46_data *ft5x46 = ms->data;
 	u8 value = ms->mode;
-	char ch[16] = {0x0,};
 
 	if (value == FT5X46_INPUT_EVENT_WAKUP_MODE_ON || value == FT5X46_INPUT_EVENT_WAKUP_MODE_OFF) {
 		if (ft5x46) {
@@ -3422,7 +3414,6 @@ static void ft5x46_switch_mode_work(struct work_struct *work)
 			if (ft5x46->in_suspend)
 				ft5x46_wakeup_reconfigure(ft5x46,
 					(bool)(value - FT5X46_INPUT_EVENT_WAKUP_MODE_OFF));
-			snprintf(ch, sizeof(ch), "%s", ft5x46->wakeup_mode ? "enabled" : "disabled");
 		}
 	}
 
@@ -3666,6 +3657,8 @@ void ft5x46_hw_init_work(struct work_struct *work)
 	gpio_set_value_cansleep(pdata->reset_gpio, 1);
 	msleep(300);
 
+	set_skip_panel_dead(true);
+
 	/* For ft5x46, must swith to stdI2C mode before enter into firmware
 	 * loading state. But this operation is not needed for ft8716/fte716.
 	 */
@@ -3711,6 +3704,9 @@ void ft5x46_hw_init_work(struct work_struct *work)
 	queue_delayed_work(ft5x46->lcd_esdcheck_workqueue,
 						&ft5x46->lcd_esdcheck_work,
 						msecs_to_jiffies(FT5X46_ESD_CHECK_PERIOD));
+
+	set_skip_panel_dead(false);
+
 	return;
 
 failed:
@@ -3757,6 +3753,8 @@ failed:
 		pdata->power_init(false);
 	else
 		ft5x46_power_init(ft5x46, false);
+
+	set_skip_panel_dead(false);
 
 	return;
 }
@@ -4289,7 +4287,6 @@ struct ft5x46_data *ft5x46_probe(struct device *dev,
 	ft5x46->hw_is_ready = false;
 	init_waitqueue_head(&ft5x46->lockdown_info_acquired_wq);
 	schedule_work(&ft5x46->work);
-	ft5x46->dbclick_count = 0;
 	return ft5x46;
 
 #ifdef FT5X46_APK_DEBUG_CHANNEL
