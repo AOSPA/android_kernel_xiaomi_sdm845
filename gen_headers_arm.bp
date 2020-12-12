@@ -615,6 +615,7 @@ gen_headers_out_arm = [
     "linux/zorro_ids.h",
     "linux/leds-lm3644.h",
     "linux/rtmv20.h",
+    "linux/wireguard.h",
     "media/cam_cpas.h",
     "media/cam_defs.h",
     "media/cam_fd.h",
