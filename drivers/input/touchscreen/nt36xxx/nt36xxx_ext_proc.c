@@ -600,6 +600,13 @@ static const struct file_operations nvt_xiaomi_config_info_fops = {
 	.release = single_release,
 };
 
+/*******************************************************
+Description:
+	Novatek touchscreen get OEM data function.
+
+return:
+	Executive outcomes. 0---success. -1---fail.
+*******************************************************/
 static int32_t nvt_get_oem_data(uint8_t *data, uint32_t flash_address, int32_t size)
 {
 	uint8_t buf[64] = {0};
@@ -613,8 +620,6 @@ static int32_t nvt_get_oem_data(uint8_t *data, uint32_t flash_address, int32_t s
 	int32_t j = 0;
 	int32_t ret = 0;
 	int32_t retry = 0;
-
-	NVT_LOG("++\n");
 
 	/* maximum 256 bytes each read */
 	if (size % 256)
@@ -668,14 +673,14 @@ get_oem_data_retry:
 
 		/* Step 5: Read Data and Checksum */
 		for (j = 0; j < ((256 / 32) + 1); j++) {
-			cur_sram_addr = ts->mmap->READ_FLASH_CHECKSUM_ADDR + j * 32;
+			cur_sram_addr
+				= ts->mmap->READ_FLASH_CHECKSUM_ADDR + j * 32;
 			buf[0] = 0xFF;
 			buf[1] = (cur_sram_addr >> 16) & 0xFF;
 			buf[2] = (cur_sram_addr  >> 8) & 0xFF;
 			CTP_I2C_WRITE(ts->client, I2C_BLDR_Address, buf, 3);
 
 			buf[0] = cur_sram_addr & 0xFF;
-
 			CTP_I2C_READ(ts->client, I2C_BLDR_Address, buf, 33);
 
 			memcpy(tmp_data + j * 32, buf + 1, 32);
@@ -684,11 +689,14 @@ get_oem_data_retry:
 		/* get checksum of the 256 bytes data read */
 		checksum_get = (uint16_t)((tmp_data[1] << 8) | tmp_data[0]);
 		/* calculate checksum of of the 256 bytes data read */
-		checksum_cal = (uint16_t)((cur_flash_addr >> 16) & 0xFF) + (uint16_t)((cur_flash_addr >> 8) & 0xFF) + (cur_flash_addr & 0xFF) + 0x00 + 0xFF;
+		checksum_cal = (uint16_t)((cur_flash_addr >> 16) & 0xFF) +
+		(uint16_t)((cur_flash_addr >> 8) & 0xFF) +
+		(cur_flash_addr & 0xFF) + 0x00 + 0xFF;
+
 		for (j = 0; j < 256; j++)
 			checksum_cal += tmp_data[j + 2];
 		checksum_cal = 65535 - checksum_cal + 1;
-		/*NVT_LOG("checksum_get = 0x%04X, checksum_cal = 0x%04X\n", checksum_get, checksum_cal);*/
+
 		/* compare the checksum got and calculated */
 		if (checksum_get != checksum_cal) {
 			if (retry < 3) {
@@ -711,8 +719,6 @@ get_oem_data_retry:
 get_oem_data_out:
 	nvt_bootloader_reset();
 	nvt_check_fw_reset_state(RESET_STATE_INIT);
-
-	NVT_LOG("--\n");
 
 	return ret;
 }
@@ -796,8 +802,6 @@ int32_t nvt_get_lockdown_info(char *lockdata)
 	uint8_t data_buf[NVT_LOCKDOWN_SIZE] = {0};
 	int ret = 0;
 
-	NVT_LOG("++\n");
-
 	if (!lockdata)
 		return -ENOMEM;
 
@@ -820,7 +824,6 @@ int32_t nvt_get_lockdown_info(char *lockdata)
 
 end:
 	mutex_unlock(&ts->lock);
-	NVT_LOG("--\n");
 
 	return ret;
 }

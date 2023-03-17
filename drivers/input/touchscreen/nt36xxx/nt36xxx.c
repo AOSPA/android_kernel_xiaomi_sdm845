@@ -1739,18 +1739,18 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 				PM_QOS_DEFAULT_VALUE);
 	}
 	update_hardware_info(TYPE_TOUCH, 5);
+	ret = nvt_get_lockdown_info(ts->lockdown_info);
+	if (ret < 0)
+		NVT_ERR("can't get lockdown info\n");
+	else {
+		NVT_LOG("sucessfully retrieved lockdown info\n");
+		update_hardware_info(TYPE_TP_MAKER, ts->lockdown_info[0] - 0x30);
+	}
+	ts->fw_name = nvt_get_config(ts);
 
 #if WAKEUP_GESTURE
 	device_init_wakeup(&ts->input_dev->dev, 1);
 #endif
-
-	update_hardware_info(TYPE_TOUCH, 5);
-	ret = nvt_get_lockdown_info(ts->lockdown_info);
-	if (ret < 0)
-		NVT_ERR("can't get lockdown info");
-	else
-		update_hardware_info(TYPE_TP_MAKER, ts->lockdown_info[0] - 0x30);
-	ts->fw_name = nvt_get_config(ts);
 
 #if BOOT_UPDATE_FIRMWARE
 	nvt_fwu_wq = alloc_workqueue("nvt_fwu_wq", WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
